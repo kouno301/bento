@@ -1,0 +1,10 @@
+
+{
+  "name": "お弁当注文アプリ",
+  "short_name": "お弁当注文",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#ffffff"
+}

@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
+    <link rel="manifest" href="./manifest.json">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>お弁当発注システム（認証・クラウド同期版）</title>
@@ -781,5 +782,14 @@
 
         loadMonthDataToState();
     </script>
+    
+<script>
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("./service-worker.js")
+      .catch((error) => console.error("Service Worker:", error));
+  });
+}
+</script>
 </body>
 </html>

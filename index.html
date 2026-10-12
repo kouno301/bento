@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>お弁当発注アプリ - カレンダー入力</title>
+    <title>お弁当発注システム（認証・クラウド同期版）</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
@@ -14,21 +14,53 @@
     </style>
 </head>
 <body class="min-h-screen p-4 sm:p-6 lg:p-8 flex justify-center items-start">
-
     <div class="w-full max-w-5xl space-y-6">
-        <header class="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 text-center">
-            <h1 class="text-2xl font-bold text-gray-800 flex items-center justify-center gap-2">
-                🍱 お弁当発注システム（クラウド同期版）
-            </h1>
-            <p class="text-gray-500 text-sm mt-1">名前を選んで、1ヶ月のカレンダーから日付ごとにメニューを選んでクラウドに保存できます</p>
-            <div id="authStatus" class="text-xs text-orange-600 mt-2 font-medium">接続中...</div>
+        <header class="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 flex flex-col sm:flex-row justify-between items-center gap-4">
+            <div>
+                <h1 class="text-2xl font-bold text-gray-800 flex items-center justify-center sm:justify-start gap-2">
+                    🍱 お弁当発注システム
+                </h1>
+                <p class="text-gray-500 text-sm mt-1">名前を選んで、1ヶ月のカレンダーから日付ごとにメニューを選んでクラウドに保存できます</p>
+            </div>
+            <div id="userInfoSection" class="hidden flex items-center gap-3">
+                <span id="loggedInUserEmail" class="text-xs text-gray-600 bg-gray-100 px-3 py-1.5 rounded-lg font-medium"></span>
+                <button id="logoutBtn" type="button" class="bg-gray-200 hover:bg-gray-300 text-gray-700 text-xs font-semibold py-1.5 px-3 rounded-lg transition active:scale-95">
+                    ログアウト
+                </button>
+            </div>
         </header>
 
-        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        <section id="authContainer" class="bg-white rounded-2xl p-8 shadow-sm border border-gray-100 max-w-md mx-auto">
+            <h2 id="authFormTitle" class="text-xl font-bold text-gray-800 mb-6 text-center">ログイン</h2>
+            
+            <form id="authForm" class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">メールアドレス</label>
+                    <input type="email" id="authEmail" required placeholder="example@email.com" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none transition text-gray-800">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">パスワード</label>
+                    <input type="password" id="authPassword" required placeholder="••••••••" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none transition text-gray-800">
+                </div>
+                
+                <button type="submit" id="authSubmitBtn" class="w-full bg-orange-500 hover:bg-orange-600 text-white font-semibold py-2.5 px-4 rounded-lg shadow transition duration-200 active:scale-95">
+                    ログイン
+                </button>
+            </form>
+
+            <div class="mt-4 text-center">
+                <button type="button" id="toggleAuthModeBtn" class="text-xs text-orange-600 hover:underline font-medium">
+                    アカウントをお持ちでない方は新規登録へ
+                </button>
+            </div>
+        </section>
+
+        <div id="mainAppContainer" class="grid grid-cols-1 lg:grid-cols-12 gap-6 hidden">
             <!-- フォームセクション（カレンダー入力） -->
             <section class="lg:col-span-7 bg-white rounded-2xl p-6 shadow-sm border border-gray-100 h-fit">
-                <h2 class="text-lg font-semibold text-gray-800 mb-4 pb-2 border-b border-gray-100 flex items-center gap-2">
-                    📅 1ヶ月メニュー入力
+                <h2 class="text-lg font-semibold text-gray-800 mb-4 pb-2 border-b border-gray-100 flex items-center justify-between">
+                    <span>📅 1ヶ月メニュー入力</span>
+                    <span id="saveStatusIndicator" class="text-xs font-normal text-gray-400"></span>
                 </h2>
 
                 <div class="space-y-4 mb-6">
@@ -61,8 +93,8 @@
                     <div class="text-xs text-gray-500 bg-gray-50 p-3 rounded-lg border border-gray-200 space-y-1">
                         <p class="font-medium text-gray-700">📌 入力ヒント</p>
                         <p>・<span class="font-bold text-orange-600">-</span> : 注文なし</p>
-                        <p>・<span class="font-bold text-orange-600">1</span> (おかず・ごはん)</p>
-                        <p>・<span class="font-bold text-orange-600">2</span> (おかずのみ)</p>
+                        <p>・<span class="font-bold text-orange-600">1</span> : おかず・ごはん</p>
+                        <p>・<span class="font-bold text-orange-600">2</span> : おかずのみ</p>
                     </div>
                 </div>
 
@@ -71,7 +103,7 @@
                         <span class="text-red-500">日</span><span>月</span><span>火</span><span>水</span><span>木</span><span>金</span><span class="text-blue-500">土</span>
                     </div>
                     <div id="calendarDaysGrid" class="grid grid-cols-7 gap-1.5">
-                        <!-- ical/calendar days injected by JS -->
+                        <!-- カレンダーの日付セルがここに挿入されます -->
                     </div>
 
                     <button id="saveCalendarBtn" type="button" class="w-full mt-6 bg-orange-500 hover:bg-orange-600 text-white font-semibold py-2.5 px-4 rounded-lg shadow transition duration-200 active:scale-95 flex items-center justify-center gap-2">
@@ -84,6 +116,7 @@
                 </div>
             </section>
 
+            <!-- 注文一覧セクション -->
             <section class="lg:col-span-5 bg-white rounded-2xl p-6 shadow-sm border border-gray-100 h-fit">
                 <div class="flex items-center justify-between mb-4 pb-2 border-b border-gray-100 gap-2">
                     <h2 class="text-lg font-semibold text-gray-800 flex items-center gap-2">
@@ -122,7 +155,7 @@
                             </tr>
                         </thead>
                         <tbody id="orderTableBody" class="divide-y divide-gray-100">
-                            <!-- JS will inject rows here -->
+                            <!-- 注文データ行がここに挿入されます -->
                         </tbody>
                     </table>
                 </div>
@@ -145,7 +178,6 @@
             <div>
                 <label for="csvMonthSelect" class="block text-sm font-medium text-gray-700 mb-1">対象月を選択</label>
                 <select id="csvMonthSelect" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none transition text-gray-800 bg-white">
-                    <!-- 選択肢はJSで動的に生成 -->
                 </select>
             </div>
 
@@ -172,23 +204,56 @@
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, collection, doc, setDoc, deleteDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { 
+            getAuth, 
+            signInWithEmailAndPassword, 
+            createUserWithEmailAndPassword, 
+            signOut, 
+            onAuthStateChanged 
+        } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { 
+            getFirestore, 
+            collection, 
+            doc, 
+            setDoc, 
+            deleteDoc, 
+            onSnapshot 
+        } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // Firebase configuration and initialization
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
+        // ==========================================
+        // 🛠️ Firebase設定
+        // ==========================================
+        const firebaseConfig = {
+            apiKey: "AIzaSyArM6BTc4AFfrwKurFvubv8GWcG454ZM0g",
+            authDomain: "obento-d488d.firebaseapp.com",
+            projectId: "obento-d488d",
+            storageBucket: "obento-d488d.firebasestorage.app",
+            messagingSenderId: "172792169690",
+            appId: "1:172792169690:web:93aff3305b553931b9d1e3"
+        };
 
-        let app, db, auth;
-        let orders = [];
-        let currentYear = new Date().getFullYear();
-        let currentMonth = new Date().getMonth();
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
 
-        // DOM Elements
-        const authStatus = document.getElementById('authStatus');
+        const ORDERS_COLLECTION_PATH = "bento_orders";
+
+        // DOM要素
+        const authContainer = document.getElementById('authContainer');
+        const mainAppContainer = document.getElementById('mainAppContainer');
+        const userInfoSection = document.getElementById('userInfoSection');
+        const loggedInUserEmail = document.getElementById('loggedInUserEmail');
+        const logoutBtn = document.getElementById('logoutBtn');
+        const authForm = document.getElementById('authForm');
+        const authFormTitle = document.getElementById('authFormTitle');
+        const authEmailInput = document.getElementById('authEmail');
+        const authPasswordInput = document.getElementById('authPassword');
+        const authSubmitBtn = document.getElementById('authSubmitBtn');
+        const toggleAuthModeBtn = document.getElementById('toggleAuthModeBtn');
+
         const userNameSelect = document.getElementById('userNameSelect');
         const customNameContainer = document.getElementById('customNameContainer');
-        const userNameCustomInput = document.getElementById('userNameCustom');
+        const userNameCustom = document.getElementById('userNameCustom');
         const prevMonthBtn = document.getElementById('prevMonthBtn');
         const nextMonthBtn = document.getElementById('nextMonthBtn');
         const currentMonthLabel = document.getElementById('currentMonthLabel');
@@ -196,23 +261,35 @@
         const calendarPrompt = document.getElementById('calendarPrompt');
         const calendarDaysGrid = document.getElementById('calendarDaysGrid');
         const saveCalendarBtn = document.getElementById('saveCalendarBtn');
-        
+        const saveStatusIndicator = document.getElementById('saveStatusIndicator');
+
         const searchNameSelect = document.getElementById('searchNameSelect');
+        const orderTableBody = document.getElementById('orderTableBody');
+        const totalCount = document.getElementById('totalCount');
+        const emptyState = document.getElementById('emptyState');
+
         const openCsvModalBtn = document.getElementById('openCsvModalBtn');
         const csvModal = document.getElementById('csvModal');
         const closeCsvModalBtn = document.getElementById('closeCsvModalBtn');
         const confirmCsvDownloadBtn = document.getElementById('confirmCsvDownloadBtn');
         const csvMonthSelect = document.getElementById('csvMonthSelect');
-        const orderTableBody = document.getElementById('orderTableBody');
-        const emptyState = document.getElementById('emptyState');
-        const totalCount = document.getElementById('totalCount');
-        
+
         const messageModal = document.getElementById('messageModal');
         const modalMessageText = document.getElementById('modalMessageText');
         const closeModalBtn = document.getElementById('closeModalBtn');
 
-        function showCustomAlert(msg) {
-            modalMessageText.textContent = msg;
+        // アプリ状態
+        let isSignUpMode = false;
+        let ordersData = [];
+        let currentYear = new Date().getFullYear();
+        let currentMonth = new Date().getMonth() + 1; // 1-12
+        let currentMonthSelections = {}; // key: "YYYY-MM-DD", value: "1" or "2" or "-"
+
+        // デフォルトメンバーリスト
+        const defaultNames = ["徳井", "木下", "周防", "中島", "森"];
+
+        function showMessage(text) {
+            modalMessageText.textContent = text;
             messageModal.classList.remove('hidden');
         }
 
@@ -220,71 +297,167 @@
             messageModal.classList.add('hidden');
         });
 
-        // Initialize Firebase and Auth
-        async function initFirebase() {
-            try {
-                app = initializeApp(firebaseConfig);
-                db = getFirestore(app);
-                auth = getAuth(app);
-
-                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                    await signInWithCustomToken(auth, __initial_auth_token);
-                } else {
-                    await signInAnonymously(auth);
-                }
-
-                onAuthStateChanged(auth, (user) => {
-                    if (user) {
-                        authStatus.textContent = '● クラウド接続完了';
-                        setupRealtimeListener();
-                    } else {
-                        authStatus.textContent = '○ 認証待機中...';
-                    }
-                });
-            } catch (err) {
-                console.error("Firebase initialization error:", err);
-                authStatus.textContent = '⚠️ クラウド接続エラー（ローカルモード）';
+        // 認証モード切替（ログイン ⇔ 新規登録）
+        toggleAuthModeBtn.addEventListener('click', () => {
+            isSignUpMode = !isSignUpMode;
+            if (isSignUpMode) {
+                authFormTitle.textContent = "新規アカウント登録";
+                authSubmitBtn.textContent = "登録する";
+                toggleAuthModeBtn.textContent = "すでにアカウントをお持ちの方はログインへ";
+            } else {
+                authFormTitle.textContent = "ログイン";
+                authSubmitBtn.textContent = "ログイン";
+                toggleAuthModeBtn.textContent = "アカウントをお持ちでない方は新規登録へ";
             }
-        }
+        });
 
-        // Realtime listener for Firestore public collection
-        function setupRealtimeListener() {
-            if (!db) return;
-            const ordersCol = collection(db, 'artifacts', appId, 'public', 'data', 'orders');
-            
-            onSnapshot(ordersCol, (snapshot) => {
-                orders = [];
-                snapshot.forEach(docSnap => {
-                    orders.push({ id: docSnap.id, ...docSnap.data() });
+        // 認証フォーム送信
+        authForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const email = authEmailInput.value.trim();
+            const password = authPasswordInput.value;
+
+            try {
+                authSubmitBtn.disabled = true;
+                if (isSignUpMode) {
+                    await createUserWithEmailAndPassword(auth, email, password);
+                } else {
+                    await signInWithEmailAndPassword(auth, email, password);
+                }
+            } catch (error) {
+                console.error("Auth error:", error);
+                let errMsg = "認証に失敗しました。";
+                if (error.code === 'auth/email-already-in-use') errMsg = "このメールアドレスはすでに登録されています。";
+                if (error.code === 'auth/invalid-credential' || error.code === 'auth/wrong-password' || error.code === 'auth/user-not-found') {
+                    errMsg = "メールアドレスまたはパスワードが正しくありません。アカウントをお持ちでない場合は「新規登録へ」から登録してください。";
+                }
+                if (error.code === 'auth/weak-password') errMsg = "パスワードは6文字以上で入力してください。";
+                if (error.code === 'auth/invalid-email') errMsg = "有効なメールアドレスを入力してください。";
+                showMessage(errMsg);
+            } finally {
+                authSubmitBtn.disabled = false;
+            }
+        });
+
+        // ログアウト
+        logoutBtn.addEventListener('click', async () => {
+            try {
+                await signOut(auth);
+            } catch (error) {
+                console.error("Logout error:", error);
+            }
+        });
+
+        // 認証状態の監視
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                authContainer.classList.add('hidden');
+                mainAppContainer.classList.remove('hidden');
+                userInfoSection.classList.remove('hidden');
+                loggedInUserEmail.textContent = user.email;
+                authSubmitBtn.disabled = false;
+                
+                initFirestoreListener();
+            } else {
+                authContainer.classList.remove('hidden');
+                mainAppContainer.classList.add('hidden');
+                userInfoSection.classList.add('hidden');
+                authSubmitBtn.disabled = false;
+                ordersData = [];
+                renderTable();
+            }
+        });
+
+        // Firestoreから注文データをリアルタイム取得
+        let unsubscribeOrders = null;
+        function initFirestoreListener() {
+            if (unsubscribeOrders) unsubscribeOrders();
+
+            const q = collection(db, ORDERS_COLLECTION_PATH);
+            unsubscribeOrders = onSnapshot(q, (snapshot) => {
+                ordersData = [];
+                snapshot.forEach((docSnap) => {
+                    ordersData.push({ id: docSnap.id, ...docSnap.data() });
                 });
-                renderOrders();
+                updateNameDropdowns();
+                renderTable();
+                loadMonthDataToState();
                 renderCalendar();
             }, (error) => {
-                console.error("Firestore snapshot error:", error);
+                console.error("Firestore sync error:", error);
+                saveStatusIndicator.textContent = "⚠️ 同期エラー";
+                saveStatusIndicator.className = "text-xs font-normal text-red-500";
             });
         }
 
-        // Toggle custom name input visibility
-        userNameSelect.addEventListener('change', (e) => {
-            if (e.target.value === '__custom__') {
+        // 名前のドロップダウンや検索セレクトを更新
+        function updateNameDropdowns() {
+            const currentSelectedName = userNameSelect.value;
+            const currentSearchName = searchNameSelect.value;
+
+            const allNamesSet = new Set(defaultNames);
+            ordersData.forEach(item => {
+                if (item.name) allNamesSet.add(item.name);
+            });
+            const uniqueNames = Array.from(allNamesSet);
+
+            userNameSelect.innerHTML = `<option value="" disabled selected>お名前を選択してください</option>`;
+            uniqueNames.forEach(name => {
+                const opt = document.createElement('option');
+                opt.value = name;
+                opt.textContent = name;
+                userNameSelect.appendChild(opt);
+            });
+            const customOpt = document.createElement('option');
+            customOpt.value = "__custom__";
+            customOpt.textContent = "直接入力（自由記述）";
+            userNameSelect.appendChild(customOpt);
+
+            if (uniqueNames.includes(currentSelectedName) || currentSelectedName === "__custom__") {
+                userNameSelect.value = currentSelectedName;
+            }
+
+            searchNameSelect.innerHTML = `<option value="">すべて表示</option>`;
+            uniqueNames.forEach(name => {
+                const opt = document.createElement('option');
+                opt.value = name;
+                opt.textContent = name;
+                searchNameSelect.appendChild(opt);
+            });
+            if (uniqueNames.includes(currentSearchName)) {
+                searchNameSelect.value = currentSearchName;
+            }
+        }
+
+        userNameSelect.addEventListener('change', () => {
+            if (userNameSelect.value === "__custom__") {
                 customNameContainer.classList.remove('hidden');
-                userNameCustomInput.required = true;
+                userNameCustom.focus();
             } else {
                 customNameContainer.classList.add('hidden');
-                userNameCustomInput.required = false;
-                userNameCustomInput.value = '';
+                userNameCustom.value = "";
             }
-            checkCalendarReady();
+            checkCalendarActivation();
         });
 
-        function checkCalendarReady() {
-            const val = userNameSelect.value;
-            const customVal = userNameCustomInput.value.trim();
-            const isReady = (val && val !== '__custom__') || (val === '__custom__' && customVal.length > 0);
+        userNameCustom.addEventListener('input', () => {
+            checkCalendarActivation();
+        });
 
-            if (isReady) {
+        function getActiveSelectedName() {
+            const sel = userNameSelect.value;
+            if (sel === "__custom__") {
+                return userNameCustom.value.trim();
+            }
+            return sel;
+        }
+
+        function checkCalendarActivation() {
+            const name = getActiveSelectedName();
+            if (name) {
                 calendarContainer.classList.remove('opacity-50', 'pointer-events-none');
                 calendarPrompt.classList.add('hidden');
+                loadMonthDataToState();
                 renderCalendar();
             } else {
                 calendarContainer.classList.add('opacity-50', 'pointer-events-none');
@@ -292,141 +465,247 @@
             }
         }
 
-        userNameCustomInput.addEventListener('input', () => {
-            checkCalendarReady();
-        });
-
         prevMonthBtn.addEventListener('click', () => {
             currentMonth--;
-            if (currentMonth < 0) {
-                currentMonth = 11;
+            if (currentMonth < 1) {
+                currentMonth = 12;
                 currentYear--;
             }
+            loadMonthDataToState();
             renderCalendar();
         });
 
         nextMonthBtn.addEventListener('click', () => {
             currentMonth++;
-            if (currentMonth > 11) {
-                currentMonth = 0;
+            if (currentMonth > 12) {
+                currentMonth = 1;
                 currentYear++;
             }
+            loadMonthDataToState();
             renderCalendar();
         });
 
-        function renderCalendar() {
-            currentMonthLabel.textContent = `${currentYear}年${currentMonth + 1}月`;
-            calendarDaysGrid.innerHTML = '';
+        // 注文データをカレンダーの選択状態に反映する
+        function loadMonthDataToState() {
+            currentMonthLabel.textContent = `${currentYear}年${currentMonth}月`;
+            currentMonthSelections = {};
 
-            const firstDayIndex = new Date(currentYear, currentMonth, 1).getDay();
-            const lastDay = new Date(currentYear, currentMonth + 1, 0).getDate();
+            const name = getActiveSelectedName();
+            const daysInMonth = new Date(currentYear, currentMonth, 0).getDate();
 
-            let activeName = userNameSelect.value === '__custom__' ? userNameCustomInput.value.trim() : userNameSelect.value;
-
-            for (let i = 0; i < firstDayIndex; i++) {
-                const emptyCell = document.createElement('div');
-                calendarDaysGrid.appendChild(emptyCell);
+            for (let day = 1; day <= daysInMonth; day++) {
+                const mm = String(currentMonth).padStart(2, '0');
+                const dd = String(day).padStart(2, '0');
+                const dateStr = `${currentYear}-${mm}-${dd}`;
+                currentMonthSelections[dateStr] = "-";
             }
 
-            for (let day = 1; day <= lastDay; day++) {
-                const monthStr = String(currentMonth + 1).padStart(2, '0');
-                const dayStr = String(day).padStart(2, '0');
-                const dateStr = `${currentYear}-${monthStr}-${dayStr}`;
+            if (!name) return;
 
-                const existingOrder = orders.find(o => o.date === dateStr && o.name === activeName);
-                let currentMenuValue = '';
-                if (existingOrder) {
-                    if (existingOrder.menu === 'おかず・ごはん') currentMenuValue = '1';
-                    else if (existingOrder.menu === 'おかずのみ') currentMenuValue = '2';
+            ordersData.forEach(item => {
+                if (item.name === name && item.date && item.date.startsWith(`${currentYear}-${String(currentMonth).padStart(2, '0')}`)) {
+                    currentMonthSelections[item.date] = item.menu;
+                }
+            });
+        }
+
+        userNameSelect.addEventListener('change', loadMonthDataToState);
+        userNameCustom.addEventListener('input', loadMonthDataToState);
+
+        // カレンダー描画
+        function renderCalendar() {
+            if (!calendarContainer.classList.contains('opacity-50')) {
+                const monthStr = `${currentYear}年${currentMonth}月`;
+                if (currentMonthLabel.textContent !== monthStr) {
+                    currentMonthLabel.textContent = monthStr;
+                }
+            }
+
+            calendarDaysGrid.innerHTML = "";
+            const firstDayIndex = new Date(currentYear, currentMonth - 1, 1).getDay();
+            const daysInMonth = new Date(currentYear, currentMonth, 0).getDate();
+
+            for (let i = 0; i < firstDayIndex; i++) {
+                const emptyDiv = document.createElement('div');
+                calendarDaysGrid.appendChild(emptyDiv);
+            }
+
+            for (let day = 1; day <= daysInMonth; day++) {
+                const mm = String(currentMonth).padStart(2, '0');
+                const dd = String(day).padStart(2, '0');
+                const dateStr = `${currentYear}-${mm}-${dd}`;
+
+                if (currentMonthSelections[dateStr] === undefined) {
+                    currentMonthSelections[dateStr] = "-";
                 }
 
-                const dayCell = document.createElement('div');
-                dayCell.className = 'flex flex-col items-center bg-gray-50 p-1.5 rounded-lg border border-gray-200';
-                
-                const isWeekend = new Date(currentYear, currentMonth, day).getDay();
-                let dayColor = 'text-gray-800';
-                if (isWeekend === 0) dayColor = 'text-red-500 font-bold';
-                if (isWeekend === 6) dayColor = 'text-blue-500 font-bold';
+                const cellDiv = document.createElement('div');
+                cellDiv.className = "bg-gray-50 border border-gray-200 rounded-lg p-2 flex flex-col items-center justify-between gap-1";
 
-                dayCell.innerHTML = `
-                    <span class="text-xs font-semibold ${dayColor} mb-1">${day}</span>
-                    <select data-date="${dateStr}" class="day-menu-select w-full text-xs p-1 border border-gray-300 rounded bg-white text-center focus:ring-1 focus:ring-orange-500 outline-none">
-                        <option value="" ${currentMenuValue === '' ? 'selected' : ''}>-</option>
-                        <option value="1" ${currentMenuValue === '1' ? 'selected' : ''}>1: おかず・ごはん</option>
-                        <option value="2" ${currentMenuValue === '2' ? 'selected' : ''}>2: おかずのみ</option>
-                    </select>
+                const dayLabel = document.createElement('span');
+                dayLabel.className = "text-xs font-semibold text-gray-700";
+                dayLabel.textContent = day;
+                cellDiv.appendChild(dayLabel);
+
+                const select = document.createElement('select');
+                select.className = "w-full text-xs py-1 px-1 border border-gray-300 rounded bg-white text-gray-800 focus:ring-1 focus:ring-orange-500 outline-none font-bold text-center";
+                select.innerHTML = `
+                    <option value="-">-</option>
+                    <option value="1">1: おかず・ごはん</option>
+                    <option value="2">2: おかずのみ</option>
                 `;
+                select.value = currentMonthSelections[dateStr];
 
-                calendarDaysGrid.appendChild(dayCell);
+                select.addEventListener('change', (e) => {
+                    currentMonthSelections[dateStr] = e.target.value;
+                });
+
+                cellDiv.appendChild(select);
+                calendarDaysGrid.appendChild(cellDiv);
             }
         }
 
-        // Save Calendar Orders to Firestore
         saveCalendarBtn.addEventListener('click', async () => {
-            let activeName = userNameSelect.value === '__custom__' ? userNameCustomInput.value.trim() : userNameSelect.value;
-            if (!activeName) {
-                showCustomAlert('お名前を入力・選択してください。');
-                return;
-            }
-
-            const selects = calendarDaysGrid.querySelectorAll('.day-menu-select');
-            const monthPrefix = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}`;
-            const nowTimestamp = new Date().toISOString();
-
-            if (!db) {
-                showCustomAlert('クラウド接続が初期化されていません。');
+            const name = getActiveSelectedName();
+            if (!name) {
+                showMessage("お名前を入力または選択してください。");
                 return;
             }
 
             try {
-                // Delete existing records for this user in this month first
-                const targetOrders = orders.filter(o => o.name === activeName && o.date.startsWith(monthPrefix));
-                for (const ord of targetOrders) {
-                    await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'orders', ord.id));
-                }
+                saveStatusIndicator.textContent = "💾 保存中...";
+                saveStatusIndicator.className = "text-xs font-normal text-orange-500";
+                saveCalendarBtn.disabled = true;
 
-                let addedCount = 0;
-                for (const select of selects) {
-                    const date = select.getAttribute('data-date');
-                    const val = select.value;
-                    if (val) {
-                        let menuText = val === '1' ? 'おかず・ごはん' : 'おかずのみ';
-                        const uniqueDocId = `${activeName}_${date}`.replace(/[\s\/]/g, '_');
-                        await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'orders', uniqueDocId), {
-                            date: date,
-                            name: activeName,
-                            menu: menuText,
-                            createdAt: nowTimestamp
+                const createdAtTimestamp = new Date().toISOString();
+
+                const promises = Object.entries(currentMonthSelections).map(async ([dateStr, menu]) => {
+                    const docId = `${dateStr}_${name}`;
+                    const docRef = doc(db, ORDERS_COLLECTION_PATH, docId);
+
+                    if (menu === "-") {
+                        await deleteDoc(docRef).catch(() => {});
+                    } else {
+                        await setDoc(docRef, {
+                            date: dateStr,
+                            name: name,
+                            menu: menu,
+                            createdAt: createdAtTimestamp
                         });
-                        addedCount++;
                     }
-                }
+                });
 
-                showCustomAlert(`${activeName}さんの ${currentYear}年${currentMonth + 1}月の発注内容をクラウドに保存しました！（${addedCount}件）`);
-            } catch (err) {
-                console.error("Save error:", err);
-                showCustomAlert('保存中にエラーが発生しました。');
+                await Promise.all(promises);
+
+                saveStatusIndicator.textContent = "✅ 保存完了！";
+                saveStatusIndicator.className = "text-xs font-normal text-green-600";
+                setTimeout(() => {
+                    saveStatusIndicator.textContent = "";
+                }, 3000);
+
+            } catch (error) {
+                console.error("Save error:", error);
+                saveStatusIndicator.textContent = "❌ 保存失敗";
+                saveStatusIndicator.className = "text-xs font-normal text-red-500";
+                showMessage("保存中にエラーが発生しました。");
+            } finally {
+                saveCalendarBtn.disabled = false;
             }
         });
 
-        openCsvModalBtn.addEventListener('click', () => {
-            csvMonthSelect.innerHTML = '';
-            const monthsSet = new Set();
-            orders.forEach(o => {
-                if (o.date) monthsSet.add(o.date.slice(0, 7));
+        searchNameSelect.addEventListener('change', renderTable);
+
+        function renderTable() {
+            orderTableBody.innerHTML = "";
+            const searchFilter = searchNameSelect.value;
+
+            const sortedOrders = [...ordersData].sort((a, b) => {
+                if (a.date !== b.date) return a.date.localeCompare(b.date);
+                return a.name.localeCompare(b.name);
             });
 
-            const currentYm = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}`;
-            monthsSet.add(currentYm);
+            const filteredOrders = sortedOrders.filter(item => {
+                if (!searchFilter) return true;
+                return item.name === searchFilter;
+            });
 
-            const sortedMonths = Array.from(monthsSet).sort();
+            totalCount.textContent = `合計: ${filteredOrders.length}件`;
+
+            if (filteredOrders.length === 0) {
+                emptyState.classList.remove('hidden');
+                return;
+            } else {
+                emptyState.classList.add('hidden');
+            }
+
+            filteredOrders.forEach(item => {
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-gray-50 transition border-b border-gray-100 text-xs sm:text-sm";
+
+                let formattedCreatedAt = "-";
+                if (item.createdAt) {
+                    const dt = new Date(item.createdAt);
+                    if (!isNaN(dt.getTime())) {
+                        const yyyy = dt.getFullYear();
+                        const mm = String(dt.getMonth() + 1).padStart(2, '0');
+                        const dd = String(dt.getDate()).padStart(2, '0');
+                        const hh = String(dt.getHours()).padStart(2, '0');
+                        const min = String(dt.getMinutes()).padStart(2, '0');
+                        formattedCreatedAt = `${yyyy}/${mm}/${dd} ${hh}:${min}`;
+                    }
+                }
+
+                tr.innerHTML = `
+                    <td class="py-3 px-3 font-medium text-gray-800">${item.date}</td>
+                    <td class="py-3 px-3 font-semibold text-gray-700">${item.name}</td>
+                    <td class="py-3 px-3">
+                        <span class="inline-block px-2.5 py-1 rounded-full text-xs font-bold ${item.menu === '1' ? 'bg-orange-100 text-orange-800' : 'bg-blue-100 text-blue-800'}">
+                            ${item.menu === '1' ? '1: おかず・ごはん' : '2: おかずのみ'}
+                        </span>
+                    </td>
+                    <td class="py-3 px-3 text-gray-500 text-xs">${formattedCreatedAt}</td>
+                    <td class="py-3 px-3 text-right">
+                        <button type="button" class="delete-btn text-red-500 hover:text-red-700 font-medium px-2 py-1 rounded transition hover:bg-red-50" data-id="${item.date}_${item.name}">
+                            削除
+                        </button>
+                    </td>
+                `;
+
+                const deleteBtn = tr.querySelector('.delete-btn');
+                deleteBtn.addEventListener('click', async () => {
+                    try {
+                        await deleteDoc(doc(db, ORDERS_COLLECTION_PATH, item.id));
+                        loadMonthDataToState();
+                        renderCalendar();
+                    } catch (err) {
+                        console.error("Delete error:", err);
+                        showMessage("削除に失敗しました。");
+                    }
+                });
+
+                orderTableBody.appendChild(tr);
+            });
+        }
+
+        openCsvModalBtn.addEventListener('click', () => {
+            const monthsSet = new Set();
+            ordersData.forEach(item => {
+                if (item.date && item.date.length >= 7) {
+                    monthsSet.add(item.date.substring(0, 7));
+                }
+            });
+            const nowMonthStr = `${currentYear}-${String(currentMonth).padStart(2, '0')}`;
+            monthsSet.add(nowMonthStr);
+
+            const sortedMonths = Array.from(monthsSet).sort().reverse();
+
+            csvMonthSelect.innerHTML = "";
             sortedMonths.forEach(ym => {
                 const [y, m] = ym.split('-');
-                const option = document.createElement('option');
-                option.value = ym;
-                option.textContent = `${y}年${parseInt(m)}月`;
-                if (ym === currentYm) option.selected = true;
-                csvMonthSelect.appendChild(option);
+                const opt = document.createElement('option');
+                opt.value = ym;
+                opt.textContent = `${y}年${parseInt(m)}月`;
+                csvMonthSelect.appendChild(opt);
             });
 
             csvModal.classList.remove('hidden');
@@ -436,53 +715,62 @@
             csvModal.classList.add('hidden');
         });
 
-        csvModal.addEventListener('click', (e) => {
-            if (e.target === csvModal) csvModal.classList.add('hidden');
-        });
-
         confirmCsvDownloadBtn.addEventListener('click', () => {
-            const selectedYm = csvMonthSelect.value;
-            if (!selectedYm) return;
+            const selectedYM = csvMonthSelect.value;
+            if (!selectedYM) {
+                showMessage("対象月を選択してください。");
+                return;
+            }
 
-            const [yearStr, monthStr] = selectedYm.split('-');
+            const [yearStr, monthStr] = selectedYM.split('-');
             const year = parseInt(yearStr);
             const month = parseInt(monthStr);
-            const lastDay = new Date(year, month, 0).getDate();
+            const daysInMonth = new Date(year, month, 0).getDate();
 
-            const monthOrders = orders.filter(o => o.date && o.date.startsWith(selectedYm));
-            const defaultNames = ['徳井', '木下', '周防', '中島', '森'];
-            const namesSet = new Set(defaultNames);
-            orders.forEach(o => { if (o.name) namesSet.add(o.name); });
-            const namesList = Array.from(namesSet);
-
-            let csvRows = [];
-            let headerCols = ['名前'];
-            for (let day = 1; day <= lastDay; day++) {
-                headerCols.push(`${day}日`);
+            const dates = [];
+            for (let d = 1; d <= daysInMonth; d++) {
+                dates.push(`${year}-${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')}`);
             }
-            csvRows.push(headerCols.map(c => `"${c}"`).join(','));
 
-            namesList.forEach(name => {
-                let rowData = [name];
-                for (let day = 1; day <= lastDay; day++) {
-                    const dayStr = String(day).padStart(2, '0');
-                    const dateStr = `${selectedYm}-${dayStr}`;
-                    const found = monthOrders.find(o => o.name === name && o.date === dateStr);
-                    let menuVal = '';
-                    if (found) {
-                        menuVal = found.menu === 'おかず・ごはん' ? '1' : (found.menu === 'おかずのみ' ? '2' : found.menu);
-                    }
-                    rowData.push(menuVal);
+            const namesSet = new Set();
+            ordersData.forEach(item => {
+                if (item.date && item.date.startsWith(selectedYM)) {
+                    namesSet.add(item.name);
                 }
-                csvRows.push(rowData.map(c => `"${c}"`).join(','));
+            });
+            const names = Array.from(namesSet).sort();
+
+            if (names.length === 0) {
+                showMessage(`${year}年${month}月の注文データは存在しません。`);
+                return;
+            }
+
+            const orderLookup = {};
+            ordersData.forEach(item => {
+                if (item.date && item.date.startsWith(selectedYM)) {
+                    orderLookup[`${item.name}_${item.date}`] = item.menu;
+                }
             });
 
-            const csvContent = '\uFEFF' + csvRows.join('\n');
-            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            let csvRows = [];
+            const header = ["名前", ...dates.map(d => parseInt(d.split('-')[2]) + "日")];
+            csvRows.push(header.join(','));
+
+            names.forEach(name => {
+                const rowData = [name];
+                dates.forEach(dateStr => {
+                    const menu = orderLookup[`${name}_${dateStr}`] || "";
+                    rowData.push(menu);
+                });
+                csvRows.push(rowData.join(','));
+            });
+
+            const csvString = "\uFEFF" + csvRows.join('\r\n');
+            const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = `お弁当発注一覧_${year}年${month}月.csv`;
+            a.download = `お弁当注文一覧_${selectedYM}.csv`;
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
@@ -491,96 +779,7 @@
             csvModal.classList.add('hidden');
         });
 
-        searchNameSelect.addEventListener('change', () => {
-            renderOrders();
-        });
-
-        window.deleteOrder = async function(id) {
-            if (!db) return;
-            try {
-                await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'orders', id));
-            } catch (err) {
-                console.error("Delete error:", err);
-                showCustomAlert('削除中にエラーが発生しました。');
-            }
-        };
-
-        function updateSearchNameOptions() {
-            const currentSelected = searchNameSelect.value;
-            const defaultNames = ['徳井', '木下', '周防', '中島', '森'];
-            const namesSet = new Set(defaultNames);
-            orders.forEach(o => { if (o.name) namesSet.add(o.name); });
-
-            searchNameSelect.innerHTML = '<option value="">すべて表示</option>';
-            Array.from(namesSet).sort().forEach(name => {
-                const opt = document.createElement('option');
-                opt.value = name;
-                opt.textContent = name;
-                if (name === currentSelected) opt.selected = true;
-                searchNameSelect.appendChild(opt);
-            });
-        }
-
-        function renderOrders() {
-            updateSearchNameOptions();
-            const selectedSearchName = searchNameSelect.value;
-            
-            let filteredOrders = orders;
-            if (selectedSearchName) {
-                filteredOrders = orders.filter(o => o.name === selectedSearchName);
-            }
-
-            filteredOrders.sort((a, b) => {
-                if (a.date !== b.date) return b.date.localeCompare(a.date);
-                return (a.name || '').localeCompare(b.name || '');
-            });
-
-            orderTableBody.innerHTML = '';
-            totalCount.textContent = `合計: ${filteredOrders.length}件`;
-
-            if (filteredOrders.length === 0) {
-                emptyState.classList.remove('hidden');
-            } else {
-                emptyState.classList.add('hidden');
-                filteredOrders.forEach(order => {
-                    const tr = document.createElement('tr');
-                    tr.className = 'hover:bg-gray-50 transition border-b border-gray-50';
-
-                    let formattedTime = '-';
-                    if (order.createdAt) {
-                        const d = new Date(order.createdAt);
-                        if (!isNaN(d.getTime())) {
-                            const y = d.getFullYear();
-                            const m = String(d.getMonth() + 1).padStart(2, '0');
-                            const day = String(d.getDate()).padStart(2, '0');
-                            const h = String(d.getHours()).padStart(2, '0');
-                            const min = String(d.getMinutes()).padStart(2, '0');
-                            formattedTime = `${y}/${m}/${day} ${h}:${min}`;
-                        }
-                    }
-
-                    tr.innerHTML = `
-                        <td class="py-2.5 px-3 font-medium text-gray-800">${order.date}</td>
-                        <td class="py-2.5 px-3 text-gray-700">${order.name}</td>
-                        <td class="py-2.5 px-3 text-gray-700">
-                            <span class="px-2.5 py-0.5 rounded-full text-xs font-semibold ${order.menu === 'おかず・ごはん' ? 'bg-orange-100 text-orange-800' : 'bg-blue-100 text-blue-800'}">
-                                ${order.menu}
-                            </span>
-                        </td>
-                        <td class="py-2.5 px-3 text-xs text-gray-400">${formattedTime}</td>
-                        <td class="py-2.5 px-3 text-right">
-                            <button type="button" onclick="deleteOrder('${order.id}')" class="text-red-500 hover:text-red-700 text-xs px-2 py-1 bg-red-50 hover:bg-red-100 rounded transition font-medium">削除</button>
-                        </td>
-                    `;
-                    orderTableBody.appendChild(tr);
-                });
-            }
-        }
-
-        // Run Firebase Initialization on load
-        window.onload = function() {
-            initFirebase();
-        };
+        loadMonthDataToState();
     </script>
 </body>
 </html>

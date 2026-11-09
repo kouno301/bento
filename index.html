@@ -43,17 +43,22 @@
                     <input type="email" id="authEmail" required placeholder="example@email.com" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none transition text-gray-800">
                 </div>
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">パスワード</label>
+                    <div class="flex items-center justify-between mb-1">
+                        <label class="block text-sm font-medium text-gray-700">パスワード</label>
+                        <button type="button" id="forgotPasswordBtn" class="text-xs text-orange-600 hover:underline">パスワードをお忘れですか？</button>
+                    </div>
                     <input type="password" id="authPassword" required placeholder="••••••••" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none transition text-gray-800">
                 </div>
                 
+                <div id="authAlertBox" class="hidden p-3 rounded-lg text-xs leading-relaxed border"></div>
+
                 <button type="submit" id="authSubmitBtn" class="w-full bg-orange-500 hover:bg-orange-600 text-white font-semibold py-2.5 px-4 rounded-lg shadow transition duration-200 active:scale-95">
                     ログイン
                 </button>
             </form>
 
-            <div class="mt-4 text-center">
-                <button type="button" id="toggleAuthModeBtn" class="text-xs text-orange-600 hover:underline font-medium">
+            <div class="mt-4 pt-4 border-t border-gray-100 text-center space-y-2">
+                <button type="button" id="toggleAuthModeBtn" class="text-xs text-orange-600 hover:underline font-medium block w-full text-center">
                     アカウントをお持ちでない方は新規登録へ
                 </button>
             </div>
@@ -243,6 +248,7 @@
             getAuth, 
             signInWithEmailAndPassword, 
             createUserWithEmailAndPassword, 
+            sendPasswordResetEmail,
             signOut, 
             onAuthStateChanged 
         } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
@@ -290,6 +296,8 @@
         const authPasswordInput = document.getElementById('authPassword');
         const authSubmitBtn = document.getElementById('authSubmitBtn');
         const toggleAuthModeBtn = document.getElementById('toggleAuthModeBtn');
+        const forgotPasswordBtn = document.getElementById('forgotPasswordBtn');
+        const authAlertBox = document.getElementById('authAlertBox');
 
         const userNameSelect = document.getElementById('userNameSelect');
         const customNameContainer = document.getElementById('customNameContainer');
@@ -349,23 +357,70 @@
             messageModal.classList.add('hidden');
         });
 
+        function showAuthAlert(message, isError = true) {
+            authAlertBox.innerHTML = message;
+            authAlertBox.className = `p-3 rounded-lg text-xs leading-relaxed border ${
+                isError 
+                    ? 'bg-red-50 text-red-700 border-red-200' 
+                    : 'bg-green-50 text-green-700 border-green-200'
+            }`;
+            authAlertBox.classList.remove('hidden');
+        }
+
+        function clearAuthAlert() {
+            authAlertBox.innerHTML = '';
+            authAlertBox.classList.add('hidden');
+        }
+
         // 認証モード切替（ログイン ⇔ 新規登録）
-        toggleAuthModeBtn.addEventListener('click', () => {
-            isSignUpMode = !isSignUpMode;
+        function setAuthMode(signUp) {
+            isSignUpMode = signUp;
+            clearAuthAlert();
             if (isSignUpMode) {
                 authFormTitle.textContent = "新規アカウント登録";
-                authSubmitBtn.textContent = "登録する";
+                authSubmitBtn.textContent = "新規登録してログイン";
                 toggleAuthModeBtn.textContent = "すでにアカウントをお持ちの方はログインへ";
+                forgotPasswordBtn.classList.add('hidden');
             } else {
                 authFormTitle.textContent = "ログイン";
                 authSubmitBtn.textContent = "ログイン";
                 toggleAuthModeBtn.textContent = "アカウントをお持ちでない方は新規登録へ";
+                forgotPasswordBtn.classList.remove('hidden');
+            }
+        }
+
+        toggleAuthModeBtn.addEventListener('click', () => {
+            setAuthMode(!isSignUpMode);
+        });
+
+        // パスワードリセット処理
+        forgotPasswordBtn.addEventListener('click', async () => {
+            const email = authEmailInput.value.trim();
+            if (!email) {
+                showAuthAlert("パスワード再設定用のメールを送信するため、まず上の入力欄にメールアドレスを入力してください。");
+                authEmailInput.focus();
+                return;
+            }
+
+            try {
+                await sendPasswordResetEmail(auth, email);
+                showAuthAlert(`「${email}」宛てにパスワード再設定用の案内メールを送信しました。メール内のリンクからパスワードを再設定してください。`, false);
+            } catch (error) {
+                console.error("Password reset error:", error);
+                if (error.code === 'auth/user-not-found') {
+                    showAuthAlert("このメールアドレスのアカウントは見つかりませんでした。「新規アカウント登録」を行ってください。");
+                } else if (error.code === 'auth/invalid-email') {
+                    showAuthAlert("有効なメールアドレス形式を入力してください。");
+                } else {
+                    showAuthAlert("再設定メールの送信に失敗しました。メールアドレスをご確認ください。");
+                }
             }
         });
 
         // 認証フォーム送信
         authForm.addEventListener('submit', async (e) => {
             e.preventDefault();
+            clearAuthAlert();
             const email = authEmailInput.value.trim();
             const password = authPasswordInput.value;
 
@@ -377,15 +432,38 @@
                     await signInWithEmailAndPassword(auth, email, password);
                 }
             } catch (error) {
-                console.error("Auth error:", error);
-                let errMsg = "認証に失敗しました。";
-                if (error.code === 'auth/email-already-in-use') errMsg = "このメールアドレスはすでに登録されています。";
+                console.warn("Auth caught:", error.code, error.message);
+                
                 if (error.code === 'auth/invalid-credential' || error.code === 'auth/wrong-password' || error.code === 'auth/user-not-found') {
-                    errMsg = "メールアドレスまたはパスワードが正しくありません。アカウントをお持ちでない場合は「新規登録へ」から登録してください。";
+                    if (!isSignUpMode) {
+                        showAuthAlert(`
+                            <p class="font-bold mb-1">⚠️ ログインできませんでした</p>
+                            <p>メールアドレスまたはパスワードが正しくありません。<br>
+                            まだアカウントを作成していない場合は、以下のボタンから<b>新規登録</b>を行ってください。</p>
+                            <button type="button" id="switchToSignUpActionBtn" class="mt-2 inline-block bg-orange-600 hover:bg-orange-700 text-white font-semibold px-3 py-1.5 rounded transition">
+                                このメールアドレスで新規登録する
+                            </button>
+                        `);
+                        const quickBtn = document.getElementById('switchToSignUpActionBtn');
+                        if (quickBtn) {
+                            quickBtn.addEventListener('click', () => {
+                                setAuthMode(true);
+                            });
+                        }
+                    } else {
+                        showAuthAlert("認証情報が無効です。入力内容をご確認ください。");
+                    }
+                } else if (error.code === 'auth/email-already-in-use') {
+                    showAuthAlert("このメールアドレスは既に登録されています。「ログインへ」からパスワードを入力してログインしてください。");
+                } else if (error.code === 'auth/weak-password') {
+                    showAuthAlert("パスワードは6文字以上で入力してください。");
+                } else if (error.code === 'auth/invalid-email') {
+                    showAuthAlert("有効なメールアドレスを入力してください。");
+                } else if (error.code === 'auth/too-many-requests') {
+                    showAuthAlert("ログインの試行回数が多すぎます。しばらく時間を置いてから再度お試しください。");
+                } else {
+                    showAuthAlert(`認証エラーが発生しました: ${error.message}`);
                 }
-                if (error.code === 'auth/weak-password') errMsg = "パスワードは6文字以上で入力してください。";
-                if (error.code === 'auth/invalid-email') errMsg = "有効なメールアドレスを入力してください。";
-                showMessage(errMsg);
             } finally {
                 authSubmitBtn.disabled = false;
             }
@@ -757,9 +835,29 @@
         }
 
         // GASによる自動メール通知関数
-        async function sendNotificationEmail(name, year, month) {
-            const subject = `【お弁当発注システム】${name} 様の注文が更新されました`;
-            const body = `${name} 様がお弁当注文を更新しました。\n\n対象月: ${year}年${month}月\n更新日時: ${new Date().toLocaleString('ja-JP')}\n\nシステムで確認してください。`;
+        async function sendNotificationEmail(name, year, month, changesList = [], currentOrdersSummary = []) {
+            const subject = `【お弁当発注システム】${name} 様の注文が更新されました（${year}年${month}月）`;
+            
+            let changesSection = "";
+            if (changesList.length > 0) {
+                changesSection = `【今回変更された注文内容】\n` + changesList.map(item => `・${item}`).join('\n') + `\n\n`;
+            } else {
+                changesSection = `【注文状況】\n今回の操作による変更箇所はありません（全保存を実行しました）。\n\n`;
+            }
+
+            let summarySection = "";
+            if (currentOrdersSummary.length > 0) {
+                summarySection = `【${year}年${month}月の注文一覧（確定分）】\n` + currentOrdersSummary.map(item => `・${item}`).join('\n') + `\n\n`;
+            } else {
+                summarySection = `【${year}年${month}月の注文一覧（確定分）】\n現在、注文はありません。\n\n`;
+            }
+
+            const body = `${name} 様がお弁当注文を更新しました。\n\n`
+                       + `対象月: ${year}年${month}月\n`
+                       + `更新日時: ${new Date().toLocaleString('ja-JP')}\n\n`
+                       + changesSection
+                       + summarySection
+                       + `システムにて詳細をご確認ください。`;
 
             // 登録されている宛先一覧（空の場合はデフォルト）
             const targets = recipientEmails.length > 0 ? recipientEmails : [DEFAULT_NOTIFICATION_EMAIL];
@@ -773,7 +871,8 @@
                         to: targets.join(','),
                         recipients: targets,
                         subject: subject,
-                        body: body
+                        body: body,
+                        changes: changesList
                     })
                 });
                 console.log("GAS email notification request dispatched to:", targets);
@@ -795,6 +894,25 @@
                 saveCalendarBtn.disabled = true;
 
                 const createdAtTimestamp = new Date().toISOString();
+                const monthPrefix = `${currentYear}-${String(currentMonth).padStart(2, '0')}`;
+
+                // --- 差分（変更箇所）の検出 ---
+                // 保存前の元データを辞書化
+                const oldMenuMap = {};
+                ordersData.forEach(item => {
+                    if (item.name === name && item.date && item.date.startsWith(monthPrefix)) {
+                        oldMenuMap[item.date] = item.menu;
+                    }
+                });
+
+                const menuLabels = {
+                    "-": "注文なし(-)",
+                    "1": "1: 食事付",
+                    "2": "2: おかずのみ"
+                };
+
+                const changesList = [];
+                const currentOrdersSummary = [];
 
                 // 1. 保留されていた削除の確定
                 const deletePromises = Array.from(pendingDeletes).map(async (docId) => {
@@ -804,18 +922,34 @@
                 await Promise.all(deletePromises);
                 pendingDeletes.clear();
 
-                // 2. カレンダーの注文内容の保存
-                const promises = Object.entries(currentMonthSelections).map(async ([dateStr, menu]) => {
+                // 2. カレンダーの注文内容の保存および変更点の集計
+                const sortedDates = Object.keys(currentMonthSelections).sort();
+                const promises = sortedDates.map(async (dateStr) => {
+                    const newMenu = currentMonthSelections[dateStr];
+                    const oldMenu = oldMenuMap[dateStr] || "-";
+
+                    // 変更があるか判定
+                    if (newMenu !== oldMenu) {
+                        const oldLabel = menuLabels[oldMenu] || oldMenu;
+                        const newLabel = menuLabels[newMenu] || newMenu;
+                        changesList.push(`${dateStr} : ${oldLabel} ➔ ${newLabel}`);
+                    }
+
+                    // 確定後のサマリー用（「-」以外）
+                    if (newMenu !== "-") {
+                        currentOrdersSummary.push(`${dateStr} : ${menuLabels[newMenu] || newMenu}`);
+                    }
+
                     const docId = `${dateStr}_${name}`;
                     const docRef = doc(db, ORDERS_COLLECTION_PATH, docId);
 
-                    if (menu === "-") {
+                    if (newMenu === "-") {
                         await deleteDoc(docRef).catch(() => {});
                     } else {
                         await setDoc(docRef, {
                             date: dateStr,
                             name: name,
-                            menu: menu,
+                            menu: newMenu,
                             createdAt: createdAtTimestamp
                         });
                     }
@@ -823,8 +957,8 @@
 
                 await Promise.all(promises);
 
-                // 3. GAS経由での自動案内メール送信
-                sendNotificationEmail(name, currentYear, currentMonth);
+                // 3. 変更箇所を記載した自動案内メール送信
+                sendNotificationEmail(name, currentYear, currentMonth, changesList, currentOrdersSummary);
 
                 saveStatusIndicator.textContent = "✅ 保存完了！";
                 saveStatusIndicator.className = "text-xs font-normal text-green-600";

@@ -24,6 +24,9 @@
                 <p class="text-gray-500 text-sm mt-1">名前を選んで、1ヶ月のカレンダーから日付ごとにメニューを選んでクラウドに保存できます</p>
             </div>
             <div id="userInfoSection" class="hidden flex items-center gap-3">
+                <button id="openEmailSettingsBtn" type="button" class="bg-orange-50 hover:bg-orange-100 text-orange-700 border border-orange-200 text-xs font-semibold py-1.5 px-3 rounded-lg transition active:scale-95 flex items-center gap-1.5">
+                    <span>📧 配信先設定</span>
+                </button>
                 <span id="loggedInUserEmail" class="text-xs text-gray-600 bg-gray-100 px-3 py-1.5 rounded-lg font-medium"></span>
                 <button id="logoutBtn" type="button" class="bg-gray-200 hover:bg-gray-300 text-gray-700 text-xs font-semibold py-1.5 px-3 rounded-lg transition active:scale-95">
                     ログアウト
@@ -188,6 +191,42 @@
         </div>
     </div>
 
+    <!-- メール配信先設定モーダル -->
+    <div id="emailSettingsModal" class="fixed inset-0 bg-black/50 hidden flex items-center justify-center p-4 z-50">
+        <div class="bg-white rounded-2xl p-6 w-full max-w-md shadow-xl space-y-4">
+            <div class="flex items-center justify-between pb-2 border-b border-gray-100">
+                <h3 class="text-lg font-bold text-gray-800 flex items-center gap-2">
+                    📧 メール配信先の管理
+                </h3>
+                <button id="closeEmailModalXBtn" type="button" class="text-gray-400 hover:text-gray-600 text-xl font-bold leading-none">&times;</button>
+            </div>
+            
+            <p class="text-xs text-gray-500">
+                注文保存時に通知メールを送信する宛先アドレスを追加・削除できます。
+            </p>
+
+            <form id="addEmailForm" class="flex gap-2">
+                <input type="email" id="newRecipientEmailInput" required placeholder="name@company.com" class="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none transition text-gray-800">
+                <button type="submit" id="addEmailSubmitBtn" class="bg-orange-500 hover:bg-orange-600 text-white text-xs font-semibold px-4 py-2 rounded-lg shadow transition active:scale-95 whitespace-nowrap">
+                    ＋ 追加
+                </button>
+            </form>
+
+            <div class="space-y-1">
+                <label class="block text-xs font-medium text-gray-600 mb-1">現在の配信先一覧</label>
+                <div class="border border-gray-200 rounded-xl overflow-hidden max-h-48 overflow-y-auto divide-y divide-gray-100 bg-gray-50" id="recipientListContainer">
+                    <!-- 登録済みのメールアドレスがここに表示されます -->
+                </div>
+            </div>
+
+            <div class="flex items-center justify-end pt-2">
+                <button id="closeEmailSettingsBtn" type="button" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-sm font-medium transition">
+                    閉じる
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- カスタムメッセージモーダル -->
     <div id="messageModal" class="fixed inset-0 bg-black/50 hidden flex items-center justify-center p-4 z-50">
         <div class="bg-white rounded-2xl p-6 w-full max-w-sm shadow-xl space-y-4 text-center">
@@ -233,9 +272,10 @@
         const db = getFirestore(app);
 
         const ORDERS_COLLECTION_PATH = "bento_orders";
+        const LOCAL_STORAGE_RECIPIENTS_KEY = "bento_notification_recipients";
 
-        // 宛先アドレスと設定済みのGAS URL
-        const NOTIFICATION_EMAIL = "k.suo.hu@daiho-gr.co.jp";
+        // デフォルト宛先アドレスと設定済みのGAS URL
+        const DEFAULT_NOTIFICATION_EMAIL = "k.suo.hu@daiho-gr.co.jp";
         const GAS_WEBAPP_URL = "https://script.google.com/macros/s/AKfycbyZ964f5hNxluEAwlkgq3qGqRPbHkb3bxxyCXIu9MylRhfJmSQMPQodHNEH9LT0jAngrA/exec";
 
         // DOM要素
@@ -274,6 +314,15 @@
         const confirmCsvDownloadBtn = document.getElementById('confirmCsvDownloadBtn');
         const csvMonthSelect = document.getElementById('csvMonthSelect');
 
+        // メール配信先モーダル用DOM
+        const openEmailSettingsBtn = document.getElementById('openEmailSettingsBtn');
+        const emailSettingsModal = document.getElementById('emailSettingsModal');
+        const closeEmailSettingsBtn = document.getElementById('closeEmailSettingsBtn');
+        const closeEmailModalXBtn = document.getElementById('closeEmailModalXBtn');
+        const addEmailForm = document.getElementById('addEmailForm');
+        const newRecipientEmailInput = document.getElementById('newRecipientEmailInput');
+        const recipientListContainer = document.getElementById('recipientListContainer');
+
         const messageModal = document.getElementById('messageModal');
         const modalMessageText = document.getElementById('modalMessageText');
         const closeModalBtn = document.getElementById('closeModalBtn');
@@ -281,6 +330,7 @@
         // アプリ状態
         let isSignUpMode = false;
         let ordersData = [];
+        let recipientEmails = [DEFAULT_NOTIFICATION_EMAIL]; // 配信先リスト
         let pendingDeletes = new Set(); // 削除保留中のドキュメントID
         const today = new Date();
         let currentYear = today.getFullYear();
@@ -360,6 +410,7 @@
                 authSubmitBtn.disabled = false;
                 
                 initFirestoreListener();
+                initEmailSettingsListener();
             } else {
                 authContainer.classList.remove('hidden');
                 mainAppContainer.classList.add('hidden');
@@ -393,6 +444,124 @@
             });
         }
 
+        // メール配信先設定のリアルタイム取得
+        let unsubscribeEmailSettings = null;
+
+        function loadRecipientsFromStorage() {
+            try {
+                const stored = localStorage.getItem(LOCAL_STORAGE_RECIPIENTS_KEY);
+                if (stored) {
+                    const parsed = JSON.parse(stored);
+                    if (Array.isArray(parsed) && parsed.length > 0) {
+                        recipientEmails = parsed;
+                        return;
+                    }
+                }
+            } catch (e) {
+                console.warn("Failed to load recipients from localStorage:", e);
+            }
+            recipientEmails = [DEFAULT_NOTIFICATION_EMAIL];
+        }
+
+        function saveRecipientsToStorage(emails) {
+            try {
+                localStorage.setItem(LOCAL_STORAGE_RECIPIENTS_KEY, JSON.stringify(emails));
+            } catch (e) {
+                console.warn("Failed to save recipients to localStorage:", e);
+            }
+        }
+
+        function initEmailSettingsListener() {
+            if (unsubscribeEmailSettings) unsubscribeEmailSettings();
+
+            // まずローカルストレージから安全に読み込み
+            loadRecipientsFromStorage();
+            renderRecipientList();
+
+            // Firestore上の bento_orders コレクション内（既に権限があるコレクション）に
+            // 設定ドキュメントを配置することでパーミッションエラーを回避
+            const docRef = doc(db, ORDERS_COLLECTION_PATH, "__settings_notification_recipients__");
+            unsubscribeEmailSettings = onSnapshot(docRef, (docSnap) => {
+                if (docSnap.exists() && Array.isArray(docSnap.data().emails)) {
+                    recipientEmails = docSnap.data().emails;
+                    saveRecipientsToStorage(recipientEmails);
+                    renderRecipientList();
+                }
+            }, (err) => {
+                // パーミッション不足等の場合はローカルストレージで運用を継続
+                console.warn("Firestore settings sync bypassed (using local storage):", err.message);
+                loadRecipientsFromStorage();
+                renderRecipientList();
+            });
+        }
+
+        // 配信先一覧の描画
+        function renderRecipientList() {
+            recipientListContainer.innerHTML = "";
+            if (recipientEmails.length === 0) {
+                recipientListContainer.innerHTML = `<div class="p-3 text-xs text-gray-400 text-center">登録されている配信先がありません。</div>`;
+                return;
+            }
+
+            recipientEmails.forEach((email) => {
+                const itemDiv = document.createElement('div');
+                itemDiv.className = "flex items-center justify-between px-3 py-2 text-xs bg-white text-gray-700";
+                itemDiv.innerHTML = `
+                    <span class="font-medium truncate max-w-[260px]">${email}</span>
+                    <button type="button" class="text-red-500 hover:text-red-700 hover:bg-red-50 font-semibold px-2 py-1 rounded transition text-xs delete-email-btn">削除</button>
+                `;
+
+                itemDiv.querySelector('.delete-email-btn').addEventListener('click', async () => {
+                    const updated = recipientEmails.filter(e => e !== email);
+                    recipientEmails = updated;
+                    saveRecipientsToStorage(updated);
+                    renderRecipientList();
+
+                    try {
+                        const docRef = doc(db, ORDERS_COLLECTION_PATH, "__settings_notification_recipients__");
+                        await setDoc(docRef, { emails: updated });
+                    } catch (e) {
+                        console.warn("Firestore update skipped (saved locally):", e.message);
+                    }
+                });
+
+                recipientListContainer.appendChild(itemDiv);
+            });
+        }
+
+        // 配信先モーダル開閉
+        openEmailSettingsBtn.addEventListener('click', () => {
+            emailSettingsModal.classList.remove('hidden');
+        });
+        const closeEmailModal = () => emailSettingsModal.classList.add('hidden');
+        closeEmailSettingsBtn.addEventListener('click', closeEmailModal);
+        closeEmailModalXBtn.addEventListener('click', closeEmailModal);
+
+        // 新しい配信先の追加
+        addEmailForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const newEmail = newRecipientEmailInput.value.trim().toLowerCase();
+            if (!newEmail) return;
+
+            if (recipientEmails.includes(newEmail)) {
+                showMessage("このメールアドレスは既に登録されています。");
+                return;
+            }
+
+            const updated = [...recipientEmails, newEmail];
+            recipientEmails = updated;
+            saveRecipientsToStorage(updated);
+            renderRecipientList();
+            newRecipientEmailInput.value = "";
+
+            try {
+                const docRef = doc(db, ORDERS_COLLECTION_PATH, "__settings_notification_recipients__");
+                await setDoc(docRef, { emails: updated });
+            } catch (err) {
+                console.warn("Firestore update skipped (saved locally):", err.message);
+            }
+        });
+
         // 名前のドロップダウンや検索セレクトを更新
         function updateNameDropdowns() {
             const currentSelectedName = userNameSelect.value;
@@ -400,7 +569,10 @@
 
             const allNamesSet = new Set(defaultNames);
             ordersData.forEach(item => {
-                if (item.name) allNamesSet.add(item.name);
+                // 設定用特殊ドキュメントを除外
+                if (item.name && item.id !== "__settings_notification_recipients__") {
+                    allNamesSet.add(item.name);
+                }
             });
             const uniqueNames = Array.from(allNamesSet);
 
@@ -589,18 +761,22 @@
             const subject = `【お弁当発注システム】${name} 様の注文が更新されました`;
             const body = `${name} 様がお弁当注文を更新しました。\n\n対象月: ${year}年${month}月\n更新日時: ${new Date().toLocaleString('ja-JP')}\n\nシステムで確認してください。`;
 
+            // 登録されている宛先一覧（空の場合はデフォルト）
+            const targets = recipientEmails.length > 0 ? recipientEmails : [DEFAULT_NOTIFICATION_EMAIL];
+
             try {
                 await fetch(GAS_WEBAPP_URL, {
                     method: 'POST',
                     mode: 'no-cors',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        to: NOTIFICATION_EMAIL,
+                        to: targets.join(','),
+                        recipients: targets,
                         subject: subject,
                         body: body
                     })
                 });
-                console.log("GAS email notification dispatched.");
+                console.log("GAS email notification request dispatched to:", targets);
             } catch (err) {
                 console.error("GAS Email notification error:", err);
             }
@@ -674,7 +850,10 @@
             orderTableBody.innerHTML = "";
             const searchFilter = searchNameSelect.value;
 
-            const sortedOrders = [...ordersData].sort((a, b) => {
+            // 特殊設定ドキュメントを注文一覧から除外
+            const validOrders = ordersData.filter(item => item.id !== "__settings_notification_recipients__" && item.date && item.name);
+
+            const sortedOrders = [...validOrders].sort((a, b) => {
                 if (a.date !== b.date) return a.date.localeCompare(b.date);
                 return (a.name || "").localeCompare(b.name || "");
             });
